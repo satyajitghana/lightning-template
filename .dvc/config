@@ -1,4 +1,7 @@
 [core]
-    autostage = true
+    remote = local
 ['remote "gdrive"']
     url = gdrive://1Vxjx2QERJnr58ECVHsyihJXkFBpFe1fj
+    gdrive_acknowledge_abuse = true
+['remote "local"']
+    url = /workspace/temp/

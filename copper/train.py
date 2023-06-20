@@ -22,15 +22,27 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     log.info(f"Instantiating model <{cfg.model._target_}>")
     model: L.LightningModule = hydra.utils.instantiate(cfg.model)
 
+    log.info("Instantiating loggers...")
+    logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
+
+    log.info("Instantiating callbacks...")
+    callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
+
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: L.Trainer = hydra.utils.instantiate(cfg.trainer)
+    trainer: L.Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
 
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
         "model": model,
         "trainer": trainer,
+        "callbacks": callbacks,
+        "logger": logger,
     }
+
+    if logger:
+        log.info("Logging hyperparameters!")
+        utils.log_hyperparameters(object_dict)
 
     if cfg.get("compile"):
         model = torch.compile(model)
@@ -43,7 +55,7 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("test"):
         log.info("Starting testing!")
-        ckpt_path = ""
+        ckpt_path = trainer.checkpoint_callback.best_model_path
         if ckpt_path == "":
             log.warning("Best ckpt not found! Using current weights for testing...")
             ckpt_path = None

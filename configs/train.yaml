@@ -8,6 +8,8 @@ defaults:
   - model: mnist.yaml
   - paths: default.yaml
   - trainer: default.yaml
+  - logger: null
+  - callbacks: default.yaml
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
