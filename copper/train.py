@@ -1,9 +1,13 @@
 from typing import Tuple, Dict
-
+import mlflow
+import os
 import lightning as L
 import torch
 import hydra
 from omegaconf import DictConfig
+import mlflow.pytorch
+from mlflow import MlflowClient
+from lightning.pytorch.loggers.mlflow import MLFlowLogger
 
 from copper import utils
 
@@ -61,6 +65,17 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             ckpt_path = None
         trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
         log.info(f"Best ckpt path: {ckpt_path}")
+
+        for logger_ in logger:
+            if isinstance(logger_, MLFlowLogger):
+                ckpt = torch.load(ckpt_path)
+                model.load_state_dict(ckpt["state_dict"])
+                os.environ['MLFLOW_RUN_ID'] = logger_.run_id
+                os.environ['MLFLOW_EXPERIMENT_ID'] = logger_.experiment_id
+                os.environ['MLFLOW_EXPERIMENT_NAME'] = logger_._experiment_name
+                os.environ['MLFLOW_TRACKING_URI'] = logger_._tracking_uri
+                mlflow.pytorch.log_model(model, "model")
+                break
 
     test_metrics = trainer.callback_metrics
 
