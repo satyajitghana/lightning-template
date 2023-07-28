@@ -1,6 +1,9 @@
 import requests
 import torch
 import io
+import os
+import redis
+import hashlib
 
 import numpy as np
 
@@ -31,12 +34,32 @@ processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 # load image embeddings
 img_embeds = torch.tensor(np.load("image_embeds.npy"))
 
+r = redis.Redis(
+    host=os.environ["CACHE_HOST"],
+    port=os.environ["CACHE_PORT"]
+)
+
 
 @app.get("/text-to-image")
 async def find_image(text: str):
-    inputs = processor([text], padding=True, return_tensors="pt")
-    with torch.no_grad():
-        text_features = model.get_text_features(**inputs)
+    inp_hash = hashlib.md5(text.encode()).hexdigest()
+
+    # check if input is in cache
+    if r.exists(inp_hash):
+        text_feats_enc_b = r.get(inp_hash)
+        text_feats_np = np.load(io.BytesIO(
+            text_feats_enc_b), allow_pickle=True)
+        text_features = torch.tensor(text_feats_np)
+    else:
+        inputs = processor([text], padding=True, return_tensors="pt")
+        with torch.no_grad():
+            text_features = model.get_text_features(**inputs)
+
+        # save it in cache
+        np_bytes = io.BytesIO()
+        np.save(np_bytes, text_features.cpu().numpy(), allow_pickle=True)
+        r.set(inp_hash, np_bytes.getvalue())
+
     image_embeds = img_embeds / img_embeds.norm(p=2, dim=-1, keepdim=True)
     text_embeds = text_features / text_features.norm(p=2, dim=-1, keepdim=True)
     logit_scale = model.logit_scale.exp()

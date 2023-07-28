@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  model:
+    build: .
+    volumes:
+      - .cache:/root/.cache
+    ports:
+      - 10000:80
+    environment:
+      - CACHE_HOST=cache
+      - CACHE_PORT=6379
+    depends_on:
+      - cache
+  cache:
+    image: redis:7.0-alpine
+    restart: always
+    volumes: 
+      - cache:/data
+
+volumes:
+  cache:
+    driver: local
